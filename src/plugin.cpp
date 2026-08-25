@@ -2,14 +2,15 @@
 
 #include "plugin.h"
 
+#include "CServerSideClient.h"
 #include "netmessages.pb.h"
+
+#include "module.hpp"
 
 #include "eiface.h"
 #include "iserver.h"
 #include "playerslot.h"
-#include "utlvector.h"
 #include "interfaces/interfaces.h"
-#include "engine/igameeventsystem.h"
 
 #include <cstdio>
 #include <cstring>
@@ -18,16 +19,16 @@
 #define VERSION_STRING SEMVER " @ " GITHUB_SHA
 #define BUILD_TIMESTAMP __DATE__ " " __TIME__
 
+using namespace DynLibUtils;
+
 Plugin g_Plugin;
 PLUGIN_EXPOSE(Plugin, g_Plugin);
-
-IGameEventSystem* g_pGameEventSystem = nullptr;
 
 class GameSessionConfiguration_t
 {
 };
 
-SH_DECL_HOOK8_void(IGameEventSystem, PostEventAbstract, SH_NOATTRIB, 0, CSplitScreenSlot, bool, int, const uint64*, INetworkMessageInternal*, const CNetMessage*, unsigned long, NetChannelBufType_t);
+SH_DECL_HOOK2(CServerSideClient, SendNetMessage, SH_NOATTRIB, 0, bool, const CNetMessage*, NetChannelBufType_t);
 SH_DECL_HOOK3_void(INetworkServerService, StartupServer, SH_NOATTRIB, 0, const GameSessionConfiguration_t&, ISource2WorldSession*, const char*);
 
 bool Plugin::Load(PluginId id, ISmmAPI* ismm, char* error, size_t maxlen, bool late)
@@ -35,45 +36,80 @@ bool Plugin::Load(PluginId id, ISmmAPI* ismm, char* error, size_t maxlen, bool l
 	PLUGIN_SAVEVARS();
 	SH_METAMOD_OVERRIDE_SAVEVARS(id);
 
-	GET_V_IFACE_CURRENT(GetEngineFactory, g_pGameEventSystem, IGameEventSystem, GAMEEVENTSYSTEM_INTERFACE_VERSION);
+	GET_V_IFACE_CURRENT(GetEngineFactory, g_pEngineServer, IVEngineServer2, INTERFACEVERSION_VENGINESERVER);
 	GET_V_IFACE_CURRENT(GetEngineFactory, g_pNetworkServerService, INetworkServerService, NETWORKSERVERSERVICE_INTERFACE_VERSION);
 
-	m_iPostEventAbstractHookID = SH_ADD_HOOK(IGameEventSystem, PostEventAbstract, g_pGameEventSystem, SH_MEMBER(this, &Plugin::IGameEventSystem_PostEventAbstract), false);
+	// SendNetMessage runs once per recipient, so the hook knows which client the
+	// voice packet is going *to* -- that is what keys the seed. Hooked on the
+	// vtable rather than an instance (Hook_DVP takes the pointer as the vtable
+	// itself), so it covers every client without waiting for one to connect.
+	CModule libengine(g_pEngineServer);
+
+	CMemory pCServerSideClientVTable = libengine.GetVirtualTableByName("CServerSideClient");
+	if (!pCServerSideClientVTable.IsValid())
+	{
+		std::snprintf(error, maxlen, "Failed to find the CServerSideClient vtable in the engine module");
+		return false;
+	}
+
+	m_iSendNetMessageHookID = SH_ADD_DVPHOOK(CServerSideClient, SendNetMessage, pCServerSideClientVTable.RCast<CServerSideClient*>(), SH_MEMBER(this, &Plugin::CServerSideClient_SendNetMessage), false);
+	if (!m_iSendNetMessageHookID)
+	{
+		std::snprintf(error, maxlen, "Failed to create hook for CServerSideClient::SendNetMessage");
+		return false;
+	}
+
 	m_iStartupServerHookID = SH_ADD_HOOK(INetworkServerService, StartupServer, g_pNetworkServerService, SH_MEMBER(this, &Plugin::INetworkServerService_StartupServer), true);
+	if (!m_iStartupServerHookID)
+	{
+		std::snprintf(error, maxlen, "Failed to create hook for INetworkServerService::StartupServer");
+		return false;
+	}
 
 	return true;
 }
 
 bool Plugin::Unload(char* error, size_t maxlen)
 {
-	SH_REMOVE_HOOK_ID(m_iPostEventAbstractHookID);
+	SH_REMOVE_HOOK_ID(m_iSendNetMessageHookID);
 	SH_REMOVE_HOOK_ID(m_iStartupServerHookID);
 
 	return true;
 }
 
-void Plugin::IGameEventSystem_PostEventAbstract(CSplitScreenSlot nSlot, bool bLocalOnly, int nClientCount, const uint64* clients, INetworkMessageInternal* pEvent, const CNetMessage* pData, unsigned long nSize, NetChannelBufType_t bufType)
+bool Plugin::CServerSideClient_SendNetMessage(const CNetMessage* pData, NetChannelBufType_t bufType)
 {
-	if (!pEvent || !pData)
-		RETURN_META(MRES_IGNORED);
+	CServerSideClient* pThis = META_IFACEPTR(CServerSideClient);
 
-	NetMessageInfo_t* pInfo = pEvent->GetNetMessageInfo();
-	if (!pInfo || pInfo->m_MessageId != svc_VoiceData)
-		RETURN_META(MRES_IGNORED);
+	if (!pData)
+		RETURN_META_VALUE(MRES_IGNORED, true);
+
+	INetworkMessageInternal* pNetMsg = pData->GetNetMessage();
+	if (!pNetMsg)
+		RETURN_META_VALUE(MRES_IGNORED, true);
+
+	NetMessageInfo_t* pInfo = pNetMsg->GetNetMessageInfo();
+	if (!pInfo || pInfo->m_MessageId != SVC_Messages::svc_VoiceData)
+		RETURN_META_VALUE(MRES_IGNORED, true);
+
+	// The reference implementation's "playerid": the client being sent to, not
+	// the one talking.
+	const int nRecipient = pThis->GetPlayerSlot().Get();
 
 	CSVCMsg_VoiceData* pMsg = const_cast<CSVCMsg_VoiceData*>(static_cast<const CSVCMsg_VoiceData*>(pData->ToPB<CSVCMsg_VoiceData>()));
 
+	// And its "msg.Entity": the speaker.
 	const int nSpeaker = pMsg->entity();
 
-	pMsg->set_xuid(SeedForSpeaker(nSpeaker) + static_cast<uint64>(nSpeaker));
+	pMsg->set_xuid(SeedForRecipient(nRecipient) + static_cast<uint64>(nSpeaker));
 
 	if (!m_bLoggedFirstRewrite)
 	{
 		m_bLoggedFirstRewrite = true;
-		META_LOG(this, "Rewriting svc_VoiceData xuid, first packet was from client %d\n", nSpeaker);
+		META_LOG(this, "Rewriting svc_VoiceData xuid, first packet was entity %d -> slot %d\n", nSpeaker, nRecipient);
 	}
 
-	RETURN_META(MRES_IGNORED);
+	RETURN_META_VALUE(MRES_IGNORED, true);
 }
 
 void Plugin::INetworkServerService_StartupServer(const GameSessionConfiguration_t& config, ISource2WorldSession* pWorldSession, const char* pszMapName)
@@ -84,12 +120,12 @@ void Plugin::INetworkServerService_StartupServer(const GameSessionConfiguration_
 	RETURN_META(MRES_IGNORED);
 }
 
-uint64 Plugin::SeedForSpeaker(int nEntity)
+uint64 Plugin::SeedForRecipient(int nSlot)
 {
-	if (nEntity < 0 || nEntity >= kVoiceEntityLimit)
+	if (nSlot < 0 || nSlot >= ABSOLUTE_PLAYER_LIMIT)
 		return 0;
 
-	if (m_PlayerSeeds[nEntity] == 0)
+	if (m_PlayerSeeds[nSlot] == 0)
 	{
 		if (m_nSeedCursor == 0)
 		{
@@ -100,10 +136,10 @@ uint64 Plugin::SeedForSpeaker(int nEntity)
 		}
 
 		m_nSeedCursor += 66;
-		m_PlayerSeeds[nEntity] = m_nSeedCursor;
+		m_PlayerSeeds[nSlot] = m_nSeedCursor;
 	}
 
-	return m_PlayerSeeds[nEntity];
+	return m_PlayerSeeds[nSlot];
 }
 
 ///////////////////////////////////////

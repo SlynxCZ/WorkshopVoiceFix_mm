@@ -68,6 +68,8 @@ include_directories(
     # our copy. See src/plugin.h's include of
     # sourcehook/sourcehook_metamod_override.h for the caveat this carries.
     ${CMAKE_SOURCE_DIR}/vendor
+    ${CMAKE_SOURCE_DIR}/vendor/dynlibutils/include
+    ${CMAKE_SOURCE_DIR}/vendor/dynlibutils/include/dynlibutils
 )
 
 include(${CMAKE_CURRENT_LIST_DIR}/metamod/configure_metamod.cmake)

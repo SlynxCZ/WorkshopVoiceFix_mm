@@ -29,6 +29,7 @@ include(makefiles/protobuf.cmake)
 # stays out of this build.
 set(SOURCEHOOK_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(vendor/sourcehook)
+add_subdirectory(vendor/dynlibutils)
 
 file(GLOB_RECURSE SOURCE_FILES
     src/*.cpp

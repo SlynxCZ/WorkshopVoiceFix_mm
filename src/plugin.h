@@ -31,20 +31,20 @@ public:
 	bool Unload(char* error, size_t maxlen) override;
 
 private: // Hooks
-	void IGameEventSystem_PostEventAbstract(CSplitScreenSlot nSlot, bool bLocalOnly, int nClientCount, const uint64* clients, INetworkMessageInternal* pEvent, const CNetMessage* pData, unsigned long nSize, NetChannelBufType_t bufType);
+	bool CServerSideClient_SendNetMessage(const CNetMessage* pData, NetChannelBufType_t bufType);
 	void INetworkServerService_StartupServer(const GameSessionConfiguration_t& config, ISource2WorldSession* pWorldSession, const char* pszMapName);
 
-	int m_iPostEventAbstractHookID = 0;
+	int m_iSendNetMessageHookID = 0;
 	int m_iStartupServerHookID = 0;
 
 private:
-	uint64 SeedForSpeaker(int nEntity);
+	uint64 SeedForRecipient(int nSlot);
 
-	// svc_VoiceData names the speaker by entity index (slot + 1), and seeds are
-	// handed out 66 apart so no two speakers' xuid windows can overlap.
-	static constexpr int kVoiceEntityLimit = ABSOLUTE_PLAYER_LIMIT + 2;
-
-	uint64 m_PlayerSeeds[kVoiceEntityLimit] = {};
+	// Keyed by the slot of the client the voice packet is being sent *to*, and
+	// the speaker's entity index is what gets added on top. Seeds are handed
+	// out 66 apart -- wider than any entity index -- so two recipients' xuid
+	// windows can never overlap.
+	uint64 m_PlayerSeeds[ABSOLUTE_PLAYER_LIMIT] = {};
 	uint64 m_nSeedCursor = 0;
 	bool m_bLoggedFirstRewrite = false;
 

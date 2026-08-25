@@ -20,13 +20,16 @@ for sdk_target in MMSPlugin.sdk_targets:
 
   binary.compiler.linkflags += [
     MMSPlugin.sourcehook_lib['binaries_by_arch'][cxx.target.arch],
+    MMSPlugin.dynlibutils_lib[cxx.target.arch],
   ]
 
   binary.compiler.cxxincludes += [
     os.path.join(builder.sourcePath, 'src'),
     os.path.join(builder.sourcePath, 'src', 'protobuf'),
     os.path.join(builder.sourcePath, 'src', 'sdk'),
-    os.path.join(builder.sourcePath, 'vendor')
+    os.path.join(builder.sourcePath, 'vendor'),
+    os.path.join(builder.sourcePath, 'vendor', 'dynlibutils', 'include'),
+    os.path.join(builder.sourcePath, 'vendor', 'dynlibutils', 'include', 'dynlibutils')
   ]
 
   sha = os.environ.get("GITHUB_SHA_SHORT", "Local")

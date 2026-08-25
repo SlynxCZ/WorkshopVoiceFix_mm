@@ -3,7 +3,7 @@
 **Metamod plugin for CS2 — voice chat fix on workshop maps.**
 
 Scaffolded from [ConsoleSpamFix_mm](https://github.com/SlynxCZ/ConsoleSpamFix_mm):
-same build layout, same vendored SourceHook.
+same build layout, same vendored SourceHook/DynLibUtils.
 
 ## What it does
 
