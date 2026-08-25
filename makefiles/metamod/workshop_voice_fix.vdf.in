@@ -1,0 +1,5 @@
+"Metamod Plugin"
+{
+	"alias"	"workshop_voice_fix"
+	"file"	"addons/workshop_voice_fix/bin/${PROJECT_VDF_PLATFORM}/workshop_voice_fix"
+}
