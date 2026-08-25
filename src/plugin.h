@@ -38,9 +38,13 @@ private: // Hooks
 	int m_iStartupServerHookID = 0;
 
 private:
-	uint64 SeedForSpeaker(int nSlot);
+	uint64 SeedForSpeaker(int nEntity);
 
-	uint64 m_PlayerSeeds[ABSOLUTE_PLAYER_LIMIT] = {};
+	// svc_VoiceData names the speaker by entity index (slot + 1), and seeds are
+	// handed out 66 apart so no two speakers' xuid windows can overlap.
+	static constexpr int kVoiceEntityLimit = ABSOLUTE_PLAYER_LIMIT + 2;
+
+	uint64 m_PlayerSeeds[kVoiceEntityLimit] = {};
 	uint64 m_nSeedCursor = 0;
 	bool m_bLoggedFirstRewrite = false;
 

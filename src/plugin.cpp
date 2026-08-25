@@ -63,7 +63,7 @@ void Plugin::IGameEventSystem_PostEventAbstract(CSplitScreenSlot nSlot, bool bLo
 
 	CSVCMsg_VoiceData* pMsg = const_cast<CSVCMsg_VoiceData*>(static_cast<const CSVCMsg_VoiceData*>(pData->ToPB<CSVCMsg_VoiceData>()));
 
-	const int nSpeaker = pMsg->client();
+	const int nSpeaker = pMsg->entity();
 
 	pMsg->set_xuid(SeedForSpeaker(nSpeaker) + static_cast<uint64>(nSpeaker));
 
@@ -84,12 +84,12 @@ void Plugin::INetworkServerService_StartupServer(const GameSessionConfiguration_
 	RETURN_META(MRES_IGNORED);
 }
 
-uint64 Plugin::SeedForSpeaker(int nSlot)
+uint64 Plugin::SeedForSpeaker(int nEntity)
 {
-	if (nSlot < 0 || nSlot >= ABSOLUTE_PLAYER_LIMIT)
+	if (nEntity < 0 || nEntity >= kVoiceEntityLimit)
 		return 0;
 
-	if (m_PlayerSeeds[nSlot] == 0)
+	if (m_PlayerSeeds[nEntity] == 0)
 	{
 		if (m_nSeedCursor == 0)
 		{
@@ -100,10 +100,10 @@ uint64 Plugin::SeedForSpeaker(int nSlot)
 		}
 
 		m_nSeedCursor += 66;
-		m_PlayerSeeds[nSlot] = m_nSeedCursor;
+		m_PlayerSeeds[nEntity] = m_nSeedCursor;
 	}
 
-	return m_PlayerSeeds[nSlot];
+	return m_PlayerSeeds[nEntity];
 }
 
 ///////////////////////////////////////
