@@ -81,32 +81,31 @@ bool Plugin::CServerSideClient_SendNetMessage(const CNetMessage* pData, NetChann
 {
 	CServerSideClient* pThis = META_IFACEPTR(CServerSideClient);
 
-	if (!pData)
-		RETURN_META_VALUE(MRES_IGNORED, true);
-
-	INetworkMessageInternal* pNetMsg = pData->GetNetMessage();
-	if (!pNetMsg)
-		RETURN_META_VALUE(MRES_IGNORED, true);
-
-	NetMessageInfo_t* pInfo = pNetMsg->GetNetMessageInfo();
-	if (!pInfo || pInfo->m_MessageId != SVC_Messages::svc_VoiceData)
-		RETURN_META_VALUE(MRES_IGNORED, true);
-
-	// The reference implementation's "playerid": the client being sent to, not
-	// the one talking.
-	const int nRecipient = pThis->GetPlayerSlot().Get();
-
-	CSVCMsg_VoiceData* pMsg = const_cast<CSVCMsg_VoiceData*>(static_cast<const CSVCMsg_VoiceData*>(pData->ToPB<CSVCMsg_VoiceData>()));
-
-	// And its "msg.Entity": the speaker.
-	const int nSpeaker = pMsg->entity();
-
-	pMsg->set_xuid(SeedForRecipient(nRecipient) + static_cast<uint64>(nSpeaker));
-
-	if (!m_bLoggedFirstRewrite)
+	if (pData)
 	{
-		m_bLoggedFirstRewrite = true;
-		META_LOG(this, "Rewriting svc_VoiceData xuid, first packet was entity %d -> slot %d\n", nSpeaker, nRecipient);
+		INetworkMessageInternal* pNetMsg = pData->GetNetMessage();
+		if (pNetMsg)
+		{
+			NetMessageInfo_t* pInfo = pNetMsg->GetNetMessageInfo();
+			if (pInfo && pInfo->m_MessageId == SVC_Messages::svc_VoiceData)
+			{
+				// The reference implementation's "playerid": the client being sent to, not
+				// the one talking.
+				const int nRecipient = pThis->GetPlayerSlot().Get();
+
+				CSVCMsg_VoiceData* pMsg = const_cast<CSVCMsg_VoiceData*>(static_cast<const CSVCMsg_VoiceData*>(pData->ToPB<CSVCMsg_VoiceData>()));
+
+				// And its "msg.Entity": the speaker.
+				const int nSpeaker = pMsg->entity();
+
+				pMsg->set_xuid(SeedForRecipient(nRecipient) + static_cast<uint64>(nSpeaker));
+
+				if (!m_bLoggedFirstRewrite) {
+					m_bLoggedFirstRewrite = true;
+					META_LOG(this, "Rewriting svc_VoiceData xuid, first packet was entity %d -> slot %d\n", nSpeaker, nRecipient);
+				}
+			}
+		}
 	}
 
 	RETURN_META_VALUE(MRES_IGNORED, true);
