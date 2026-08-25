@@ -70,7 +70,7 @@ void Plugin::IGameEventSystem_PostEventAbstract(CSplitScreenSlot nSlot, bool bLo
 	if (!m_bLoggedFirstRewrite)
 	{
 		m_bLoggedFirstRewrite = true;
-		META_CONPRINTF("[WorkshopVoiceFix] Rewriting svc_VoiceData xuid, first packet was from client %d\n", nSpeaker);
+		META_LOG(this, "Rewriting svc_VoiceData xuid, first packet was from client %d\n", nSpeaker);
 	}
 
 	RETURN_META(MRES_IGNORED);
