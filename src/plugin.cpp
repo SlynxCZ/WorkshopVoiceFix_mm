@@ -80,7 +80,8 @@ bool Plugin::CServerSideClient_SendNetMessage(const CNetMessage* pData, NetChann
 
 				pMsg->set_xuid(SeedForRecipient(nRecipient) + static_cast<uint64>(nSpeaker));
 
-				if (!m_bLoggedFirstRewrite) {
+				if (!m_bLoggedFirstRewrite)
+				{
 					m_bLoggedFirstRewrite = true;
 					META_LOG(this, "Rewriting svc_VoiceData xuid, first packet was entity %d -> slot %d\n", nSpeaker, nRecipient);
 				}
