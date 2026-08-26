@@ -39,32 +39,12 @@ bool Plugin::Load(PluginId id, ISmmAPI* ismm, char* error, size_t maxlen, bool l
 	GET_V_IFACE_CURRENT(GetEngineFactory, g_pEngineServer, IVEngineServer2, INTERFACEVERSION_VENGINESERVER);
 	GET_V_IFACE_CURRENT(GetEngineFactory, g_pNetworkServerService, INetworkServerService, NETWORKSERVERSERVICE_INTERFACE_VERSION);
 
-	// SendNetMessage runs once per recipient, so the hook knows which client the
-	// voice packet is going *to* -- that is what keys the seed. Hooked on the
-	// vtable rather than an instance (Hook_DVP takes the pointer as the vtable
-	// itself), so it covers every client without waiting for one to connect.
 	CModule libengine(g_pEngineServer);
 
-	CMemory pCServerSideClientVTable = libengine.GetVirtualTableByName("CServerSideClient");
-	if (!pCServerSideClientVTable.IsValid())
-	{
-		std::snprintf(error, maxlen, "Failed to find the CServerSideClient vtable in the engine module");
-		return false;
-	}
+	CMemory pVTable = libengine.GetVirtualTableByName("CServerSideClient");
 
-	m_iSendNetMessageHookID = SH_ADD_DVPHOOK(CServerSideClient, SendNetMessage, pCServerSideClientVTable.RCast<CServerSideClient*>(), SH_MEMBER(this, &Plugin::CServerSideClient_SendNetMessage), false);
-	if (!m_iSendNetMessageHookID)
-	{
-		std::snprintf(error, maxlen, "Failed to create hook for CServerSideClient::SendNetMessage");
-		return false;
-	}
-
+	m_iSendNetMessageHookID = SH_ADD_DVPHOOK(CServerSideClient, SendNetMessage, pVTable.RCast<CServerSideClient*>(), SH_MEMBER(this, &Plugin::CServerSideClient_SendNetMessage), false);
 	m_iStartupServerHookID = SH_ADD_HOOK(INetworkServerService, StartupServer, g_pNetworkServerService, SH_MEMBER(this, &Plugin::INetworkServerService_StartupServer), true);
-	if (!m_iStartupServerHookID)
-	{
-		std::snprintf(error, maxlen, "Failed to create hook for INetworkServerService::StartupServer");
-		return false;
-	}
 
 	return true;
 }
