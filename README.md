@@ -1,3 +1,25 @@
+> [!WARNING]
+> **This repository is archived and no longer maintained.**
+> The workshop voice fix now lives in **[GameFixes_mm](https://github.com/SlynxCZ/GameFixes_mm)**, one Metamod:Source plugin that bundles all of my CS2 server fixes. Each fix is turned on or off on its own in the config.
+> Release binaries here were built against an older Metamod and may not load on current Metamod builds (plugin API 18).
+
+## Migrating to GameFixes_mm
+
+1. Remove `addons/workshop_voice_fix/` and `addons/metamod/workshop_voice_fix.vdf` from your server.
+2. Install the latest **[GameFixes_mm release](https://github.com/SlynxCZ/GameFixes_mm/releases)**.
+3. Enable the `workshop_voice` block in `addons/game_fixes/game_fixes.ini`:
+
+   ```
+   "workshop_voice"
+   {
+   	"enable"	"1"
+   }
+   ```
+
+Issues and PRs go to [GameFixes_mm](https://github.com/SlynxCZ/GameFixes_mm).
+
+---
+
 # WorkshopVoiceFix
 
 **Metamod plugin for CS2 — voice chat fix on workshop maps.**
